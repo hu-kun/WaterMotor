@@ -28,7 +28,7 @@ __This program is designed for the closed-loop "wall" control of rodent tactile-
    * The signals are sending to the receivers in step 4
 
 4. Signal receivers
-   * National Instrument [USB-6003](https://www.ni.com/en-us/support/model.usb-6001.html)
+   * National Instrument [USB-6366](https://www.ni.com/en-us/support/model.usb-6366.html)
 
 5. MATLAB 2018a or later version
 
