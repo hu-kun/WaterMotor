@@ -8,10 +8,10 @@ global leftPos_pre
 global rightPos_pre
 global gV
 global W
-global da
 global wallStatus
 global wallLog
 global wallMovement
+global ball_V
 
 switch byte
     case 1 % Wall forward period
@@ -47,11 +47,11 @@ switch byte
         disp([l,r]);
     case 3 % Wall keep period
         wallLog(end+1,:) = [3, 3];
-        if leftPos_current == 25 & rightPos_current == 25 % When current trial is closed loop
+        if leftPos_current == 35 && rightPos_current == 35 % When current trial is closed loop
             % Here are the adjustables
-            wallMax = 13; % mm
-            update_freq = 25; % Hz
-            dur_total = 6; % Seconds
+            wallMax = 12; % mm
+            update_freq = 50; % Hz
+            dur_total = 4; % Seconds
             
             % Init settings
             trial_count = 1;
@@ -61,9 +61,8 @@ switch byte
             wall_read_switch = 1;
             
             wallStatus_count = size(wallStatus, 1);
-            
             tic;
-            currentBallV = read_daq(da);
+            currentBallV = ball_V;
             while trial_count < trial_count_max
                 if abs(currentBallV) <= 1 % if currentBallV is 0
                     if abs(preBallV) <= 1
@@ -182,7 +181,7 @@ switch byte
                 wallStatus(wallStatus_count+3, trial_count) = currentBallV;
                 pause(1/update_freq - T_single_update); % Pausing here for a constant updating duration
                 tic; % Start to acquire the time
-                currentBallV = read_daq(da);
+                currentBallV = ball_V;
                 trial_count = trial_count + 1; %%%%% TO BE IMPROVED: the frequency can be increased. Please test it before doing this.
             end
             toc;
@@ -199,4 +198,10 @@ switch byte
         if ~isempty(W)
             W.stop;
         end
+    case 5
+        if ~isempty(W)
+            W.play(3,3); % Channel 3 - Opto Stimulation
+            W.play(4,4); % Channel 4 - Opto Indication
+        end
+end
 end

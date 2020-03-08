@@ -1,12 +1,6 @@
 function clean_com
 
-comtoclean = instrfind;
+global lh
 
-if isempty(comtoclean)
-    return;
-end
-
-fclose(comtoclean);
-delete(comtoclean);
-clear global ard
-clear comtoclean;
+delete(lh);
+clear global da

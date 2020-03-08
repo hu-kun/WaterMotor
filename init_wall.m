@@ -62,6 +62,6 @@ pause(1);
 SetJogVelParams(left_wall,0,0,500,1);
 SetJogVelParams(right_wall,0,0,500,1);
 pause(1);
-SetStageAxisInfo(left_wall,0,5,45,1,1,1);
-SetStageAxisInfo(right_wall,0,5,45,1,1,1);
+SetStageAxisInfo(left_wall,0,3,45,1,1,1);
+SetStageAxisInfo(right_wall,0,3,45,1,1,1);
 pause(0.1);

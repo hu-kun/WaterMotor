@@ -1,5 +1,5 @@
 sum = [0, 0, 0, 0];
-for i = 1:10000
+for i = 1:1000
     v_raw = 0;
     for i = 1:3
         v_raw = v_raw + da.inputSingleScan;
@@ -8,5 +8,5 @@ for i = 1:10000
     sum = sum + v_raw;
     %pause(0.01);
 end
-sum = sum / 10000
+sum = sum / 1000
 
