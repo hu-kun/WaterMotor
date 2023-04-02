@@ -8,62 +8,78 @@ global leftPos_pre
 global rightPos_pre
 global gV
 global W
-global wallStatus
 global wallLog
 global wallMovement
-global ball_V
+
+global theta
+global ball_Vl
+global ball_Vf
+global inTrialTrig
+global wall_dis_home
+global dur_CL_max
+global working_path
+global trial
+global distance_for_max
 
 switch byte
     case 1 % Wall forward period
-        wallLog(end+1,:) = [1, 1];
+        inTrialTrig = 1;
+        
+        %wallLog(end+1,:) = [1, 1];
         if ~isempty(W)
             W.play(1,1); % Channel 1 - File tigger
             W.play(2,2); % Channel 2 - Cam trigger
         end
         l = left_wall.SetVelParams(0,0,500,gV);
         r = right_wall.SetVelParams(0,0,500,gV);
-        wallLog(end+1,:) = [l, r];
-        fprintf('Moving left wall to %d, right wall to %d...', 50-leftPos_current, 50-rightPos_current);
-        l = left_wall.MoveAbsoluteEx(0,leftPos_current ,0,0);
-        r = right_wall.MoveAbsoluteEx(0,rightPos_current,0,0);
+        %wallLog(end+1,:) = [l, r];
+        fprintf('Moving left wall to %d, right wall to %d...', leftPos_current, rightPos_current);
+        l = left_wall.MoveAbsoluteEx(0,50-leftPos_current ,0,0);
+        r = right_wall.MoveAbsoluteEx(0,50-rightPos_current,0,1);
 
         leftPos_pre = leftPos_current;
         rightPos_pre = rightPos_current;
-        wallLog(end+1,:) = [l, r];
+        %wallLog(end+1,:) = [l, r];
+        wallLog = [];
         disp([l,r]);
     case 2 % Wall homing period
-        wallLog(end+1,:) = [2, 2];
-        leftPos_current = 10;
-        rightPos_current = 10;
+        %wallLog(end+1,:) = [2, 2];
+        leftPos_current = wall_dis_home;
+        rightPos_current = wall_dis_home;
         l = left_wall.SetVelParams(0,0,500,gV);
         r = right_wall.SetVelParams(0,0,500,gV);
-        wallLog(end+1,:) = [l, r];
-        fprintf('Homing to 40...');
-        l = left_wall.MoveAbsoluteEx(0,leftPos_current ,0,0);
-        r = right_wall.MoveAbsoluteEx(0,rightPos_current,0,0);
+        %wallLog(end+1,:) = [l, r];
+        fprintf('Homing...');
+        l = left_wall.MoveAbsoluteEx(0,50-leftPos_current ,0,0);
+        r = right_wall.MoveAbsoluteEx(0,50-rightPos_current,0,1);
         leftPos_pre = leftPos_current;
         rightPos_pre = rightPos_current;
-        wallLog(end+1,:) = [l, r];
-        disp([l,r]);
+        %wallLog(end+1,:) = [l, r];
+        %disp([l,r]);
     case 3 % Wall keep period
-        wallLog(end+1,:) = [3, 3];
-        if leftPos_current == 35 && rightPos_current == 35 % When current trial is closed loop
+        %wallLog(end+1,:) = [3, 3];
+        
+        if leftPos_current ==  rightPos_current % When current trial is closed loop
+            dur_curr_trial = 0;
+            distance_curr_trial = 0;
             % Here are the adjustables
-            wallMax = 12; % mm
-            update_freq = 50; % Hz
-            dur_total = 4; % Seconds
+            wallMax = leftPos_current-3; % mm
+            update_freq = 40; % Hz
+            %dur_total = 4; % Seconds
             
             % Init settings
-            trial_count = 1;
-            trial_count_max = dur_total * update_freq; % Currently working on 25 Hz, 6 seconds in total
+            %trial_count = 1;
+            %trial_count_max = dur_total * update_freq; % Currently working on 25 Hz, 6 seconds in total
             typecase = 0;
             preBallV = 0;
             wall_read_switch = 1;
             
-            wallStatus_count = size(wallStatus, 1);
-            tic;
+            ball_V = ball_Vf * sin(theta) + ball_Vl * cos(theta);
             currentBallV = ball_V;
-            while trial_count < trial_count_max
+            
+            tic;
+            
+            while dur_curr_trial < dur_CL_max - 0.01 && distance_curr_trial <= distance_for_max
                 if abs(currentBallV) <= 1 % if currentBallV is 0
                     if abs(preBallV) <= 1
                         typecase = 0;  % oo
@@ -87,19 +103,22 @@ switch byte
                 % Now it's only check the position of the left wall,
                 % because this progress takes 15ms at most.
                 wallMovement = 0;
+                switch wall_read_switch
+                    case 1
+                        leftp = 50-left_wall.GetPosition_Position(0);
+                        wallMovement = -(leftp - leftPos_current);
+                        wall_read_switch = 2;
+                        wall_pos_save = leftp;
+                    case 2
+                        rightp = 50-right_wall.GetPosition_Position(0);
+                        wallMovement = (rightp - rightPos_current);
+                        wall_read_switch = 1;
+                        wall_pos_save = rightPos_current*2-rightp;
+                end
                 if typecase > 1 % Check if the walls are moving
-                    switch wall_read_switch
-                        case 1
-                            leftp = left_wall.GetPosition_Position(0);
-                            wallMovement = leftp - leftPos_current;
-                            wall_read_switch = 2;
-                        case 2
-                            rightp = right_wall.GetPosition_Position(0);
-                            wallMovement = -(rightp - rightPos_current);
-                            wall_read_switch = 1;
-                    end
+                    
                     if ismember(typecase, [2 4]) % Check if the left wall is going positive
-                        if wallMovement > 0.5*wallMax % Check if the left wall is reaching positive limit. If so, stop
+                        if wallMovement > 0.95*wallMax % Check if the left wall is reaching positive limit. If so, stop
                             if wallMovement > wallMax
                                 currentBallV = 0;
                                 switch typecase
@@ -110,14 +129,14 @@ switch byte
                                 end
                             else
                                 % 20191006 update: To slow down the wall when it's getting closer to the limit
-                                currentBallV = currentBallV * ((abs(wallMovement) - wallMax)^2 * 4 / wallMax^2);
+                                currentBallV = currentBallV * ((wallMax-abs(wallMovement))/wallMax)^2*16;
                                 typecase = 2;
                             end
                         else % Else, keep moving
                             typecase = 2;
                         end
                     else % If the wall is going negetive
-                        if wallMovement < -0.5*wallMax % Check if the left wall is reaching negetive limit. If so, stop
+                        if wallMovement < -0.95*wallMax % Check if the left wall is reaching negetive limit. If so, stop
                             if wallMovement < -wallMax
                                 currentBallV = 0;
                                 switch typecase
@@ -127,7 +146,7 @@ switch byte
                                         typecase = 0;
                                 end
                             else
-                                currentBallV = currentBallV * ((abs(wallMovement) - wallMax)^2 * 4 / wallMax^2);
+                                currentBallV = currentBallV * ((wallMax-abs(wallMovement))/wallMax)^2*16;
                                 typecase = 3;
                             end
                         else
@@ -143,59 +162,75 @@ switch byte
                         l = left_wall.StopImmediate(0);
                         r = right_wall.StopImmediate(0);
                         if l+r ~= 0
-                            wallLog(end+1,:) = [l, r];
+                            %wallLog(end+1,:) = [l, r];
                             disp([l,r]);
                         end
                     case 2 % Left wall moves positive
-                        l = left_wall.SetJogVelParams(0,0,500,abs(currentBallV));
-                        r = right_wall.SetJogVelParams(0,0,500,abs(currentBallV));
+                        l = left_wall.SetJogVelParams(0,0,100,abs(currentBallV));
+                        r = right_wall.SetJogVelParams(0,0,100,abs(currentBallV));
                         if l+r ~= 0
-                            wallLog(end+1,:) = [l, r];
+                            %wallLog(end+1,:) = [l, r];
                             disp([l,r]);
                         end
                         l = left_wall.MoveJog(0,1);
                         r = right_wall.MoveJog(0,2);
                         if l+r ~= 0
-                            wallLog(end+1,:) = [l, r];
+                            %wallLog(end+1,:) = [l, r];
                             disp([l,r]);
                         end
                     case 3 % Left wall moves negetive
-                        l = left_wall.SetJogVelParams(0,0,500,abs(currentBallV));
-                        r = right_wall.SetJogVelParams(0,0,500,abs(currentBallV));
+                        l = left_wall.SetJogVelParams(0,0,100,abs(currentBallV));
+                        r = right_wall.SetJogVelParams(0,0,100,abs(currentBallV));
                         if l+r ~= 0
-                            wallLog(end+1,:) = [l, r];
+                            %wallLog(end+1,:) = [l, r];
                             disp([l,r]);
                         end
                         l = left_wall.MoveJog(0,2);
                         r = right_wall.MoveJog(0,1);
                         if l+r ~= 0
-                            wallLog(end+1,:) = [l, r];
+                            %wallLog(end+1,:) = [l, r];
                             disp([l,r]);
                         end
                 end
                 
                 preBallV = currentBallV;
                 T_single_update = toc; % Delete the ";" for outputing updating time
-                wallStatus(wallStatus_count+1, trial_count) = wallMovement;
-                wallStatus(wallStatus_count+2, trial_count) = T_single_update;
-                wallStatus(wallStatus_count+3, trial_count) = currentBallV;
-                pause(1/update_freq - T_single_update); % Pausing here for a constant updating duration
-                tic; % Start to acquire the time
+                %wallStatus(wallStatus_count+1, trial_count) = wallMovement;
+                %wallStatus(wallStatus_count+2, trial_count) = T_single_update;
+                %wallStatus(wallStatus_count+3, trial_count) = currentBallV;
+                T_wait = 1/update_freq - T_single_update;
+                if T_wait > 0
+                    pause(T_wait); % Pausing here for a constant updating duration
+                    T_single_update = T_single_update + T_wait;                    
+                end
+                dur_curr_trial = dur_curr_trial + T_single_update;
+                
+                distance_curr_trial = distance_curr_trial + T_single_update * ball_Vf / 2.6;
+                
+                wallLog(size(wallLog,1)+1,:) = [dur_curr_trial,wall_pos_save];
+                
+                tic;
+                ball_V = ball_Vf * sin(theta) + ball_Vl * cos(theta);
                 currentBallV = ball_V;
-                trial_count = trial_count + 1; %%%%% TO BE IMPROVED: the frequency can be increased. Please test it before doing this.
+                %trial_count = trial_count + 1; %%%%% TO BE IMPROVED: the frequency can be increased. Please test it before doing this.
             end
-            toc;
             if typecase > 1
                 l = left_wall.StopImmediate(0);
                 r = right_wall.StopImmediate(0);
                 if l+r ~= 0
-                    wallLog(end+1,:) = [l, r];
+                    %wallLog(end+1,:) = [l, r];
                     disp([l,r]);
                 end
             end
         end
     case 4
         if ~isempty(W)
+            inTrialTrig = 0;
+            W.stop;
+        end
+        if ~isempty(wallLog)
+            csvwrite(strcat(working_path, '\wall\', int2str(trial),'.csv'), wallLog);
+            wallLog = [];
             W.stop;
         end
     case 5
